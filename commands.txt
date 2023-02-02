@@ -1,0 +1,33 @@
+- testing
+RGBT:
+python main.py --rgbt_path E:/Vldarmstadt/4semester/praktikumvc/code/RGB-T-Glass-Segmentation/RGB-T-glass --resume E:/Vldarmstadt/4semester/praktikumvc/code/RGB-T-Glass-Segmentation/trained/checkpoint_egde_79.pth --eval --num_workers 3
+
+RGB:
+python main.py --rgbt_path E:/Vldarmstadt/4semester/praktikumvc/code/RGB-T-Glass-Segmentation/RGB-T-glass --is_rgbt False --resume E:/Vldarmstadt/4semester/praktikumvc/code/RGB-T-Glass-Segmentation/trained/checkpoint_rgb.pth --eval
+
+test remote
+python main.py --rgbt_path RGB-T-glass --resume trained/checkpoint.pth --eval
+
+
+RGB ssh:
+python main.py --rgbt_path RGB-T-glass --is_rgbt False --resume trained/checkpoint_rgb.pth --eval
+
+-training
+python main.py --rgbt_path RGB-T-glass --output_dir trained --num_workers 2
+
+
+
+- environments
+pip install torch==1.10.0+cu111 torchvision==0.11.0+cu111 torchaudio==0.10.0 -f https://download.pytorch.org/whl/torch_stable.html
+
+- server
+ssh kliu@PC3054.igd.fraunhofer.de
+
+-check gpu
+
+nvidia-smi -lms 5000
+-upload
+scp  test.txt kliu@PC3054.igd.fraunhofer.de: kliu
+
+-download dataset
+wget --load-cookies cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id={1ysG04qGmnZv7UaybZUuyybaJYJLUkNHX}' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id={1ysG04qGmnZv7UaybZUuyybaJYJLUkNHX}" -O RGB-T-dataset
