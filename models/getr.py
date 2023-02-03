@@ -76,8 +76,8 @@ class GETR(nn.Module):
                                                rgb_features[1].tensors, rgb_features[0].tensors],
                                               [canny_features[3].tensors, canny_features[2].tensors,
                                                canny_features[1].tensors, canny_features[0].tensors],
-                                              [canny_features[3].tensors, canny_features[2].tensors,
-                                               canny_features[1].tensors, canny_features[0].tensors],
+                                              [gabor_features[3].tensors, gabor_features[2].tensors,
+                                               gabor_features[1].tensors, gabor_features[0].tensors],
                                               final_size, gate_flag)
 
         out['pred_mask1'] = mask_list[0]
@@ -186,37 +186,43 @@ class MaskHeadSmallConv(nn.Module):
                 nn.init.kaiming_uniform_(m.weight, a=1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, fusion_memory, rgb_fpns: List[Tensor], canny_fpns: List[Tensor],gabor_fpns: List[Tensor],
+    def forward(self, fusion_memory, rgb_fpns: List[Tensor], canny_fpns: List[Tensor], gabor_fpns: List[Tensor],
                 final_size, gate_flag):
 
         x = fusion_memory
 
         rgb_cur_fpn = self.rgb_adapter1(rgb_fpns[0])
         canny_cur_fpn = self.canny_adapter1(canny_fpns[0])
+        gabor_cur_fpn = self.gabor_adapter1(gabor_fpns[0])
         edge1, mask1, x = self.inference_module1(
-            self.pa_module1(x, rgb_cur_fpn, canny_cur_fpn, gate_flag))  # 1/32
+            self.pa_module1(x, rgb_cur_fpn, canny_cur_fpn, gabor_cur_fpn, gate_flag))  # 1/32
         edge1 = F.interpolate(edge1, size=final_size, mode="bilinear")
         mask1 = F.interpolate(mask1, size=final_size, mode="bilinear")
 
         rgb_cur_fpn = self.rgb_adapter2(rgb_fpns[1])
         canny_cur_fpn = self.canny_adapter2(canny_fpns[1])
+        gabor_cur_fpn = self.gabor_adapter2(gabor_fpns[1])
         x = F.interpolate(x, size=rgb_cur_fpn.shape[-2:], mode="bilinear")
         edge2, mask2, x = self.inference_module2(
-            self.pa_module2(x, rgb_cur_fpn, canny_cur_fpn, gate_flag))  # 1/16
+            self.pa_module2(x, rgb_cur_fpn, canny_cur_fpn, gabor_cur_fpn, gate_flag))  # 1/16
         edge2 = F.interpolate(edge2, size=final_size, mode="bilinear")
         mask2 = F.interpolate(mask2, size=final_size, mode="bilinear")
 
         rgb_cur_fpn = self.rgb_adapter3(rgb_fpns[2])
         canny_cur_fpn = self.canny_adapter3(canny_fpns[2])
+        gabor_cur_fpn = self.gabor_adapter3(gabor_fpns[2])
         x = F.interpolate(x, size=rgb_cur_fpn.shape[-2:], mode="bilinear")
-        edge3, mask3, x = self.inference_module3(self.pa_module3(x, rgb_cur_fpn, canny_cur_fpn, gate_flag))  # 1/8
+        edge3, mask3, x = self.inference_module3(
+            self.pa_module3(x, rgb_cur_fpn, canny_cur_fpn, gabor_cur_fpn, gate_flag))  # 1/8
         edge3 = F.interpolate(edge3, size=final_size, mode="bilinear")
         mask3 = F.interpolate(mask3, size=final_size, mode="bilinear")
 
         rgb_cur_fpn = self.rgb_adapter4(rgb_fpns[3])
         canny_cur_fpn = self.canny_adapter4(canny_fpns[3])
+        gabor_cur_fpn = self.gabor_adapter4(gabor_fpns[3])
         x = F.interpolate(x, size=rgb_cur_fpn.shape[-2:], mode="bilinear")
-        edge4, mask4, x = self.inference_module4(self.pa_module4(x, rgb_cur_fpn, canny_cur_fpn, gate_flag))  # 1/4
+        edge4, mask4, x = self.inference_module4(
+            self.pa_module4(x, rgb_cur_fpn, canny_cur_fpn, gabor_cur_fpn, gate_flag))  # 1/4
         edge4 = F.interpolate(edge4, size=final_size, mode="bilinear")
         mask4 = F.interpolate(mask4, size=final_size, mode="bilinear")
 
@@ -254,23 +260,33 @@ class PixelAttention(nn.Module):
                                         nn.ReLU(inplace=True),
                                         nn.BatchNorm2d(inchannels),
                                         nn.Conv2d(inchannels, 1, 1))
+        self.mask_conv3 = nn.Sequential(nn.Conv2d(inchannels * 2, inchannels, kernel_size=3, stride=1, padding=1),
+                                        nn.ReLU(inplace=True),
+                                        nn.BatchNorm2d(inchannels),
+                                        nn.Conv2d(inchannels, inchannels, kernel_size=3, stride=1, padding=1),
+                                        nn.ReLU(inplace=True),
+                                        nn.BatchNorm2d(inchannels),
+                                        nn.Conv2d(inchannels, 1, 1))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_uniform_(m.weight, a=1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x, rgb, temperature, gate_flag):
+    def forward(self, x, rgb, canny, gabor, gate_flag):
 
         mask1 = self.mask_conv1(torch.cat([x, rgb], 1))
         mask1 = torch.sigmoid(mask1)
         rx = x + rgb * mask1
 
-        mask2 = self.mask_conv2(torch.cat([x, temperature], 1))
+        mask2 = self.mask_conv2(torch.cat([x, canny], 1))
         mask2 = torch.sigmoid(mask2)
 
+        mask3 = self.mask_conv2(torch.cat([x, gabor], 1))
+        mask3 = torch.sigmoid(mask3)
+
         if gate_flag:
-            x = rx + temperature * mask2
+            x = rx + canny * mask2 + gabor * mask3
         else:
             x = rx
 
