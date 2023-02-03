@@ -80,13 +80,14 @@ def evaluate(model, criterion, postprocessors, data_loader, device, output_dir, 
     rgbt_iou_list = []
     rgbt_mae_list = []
 
-    for rgb, temperature, targets, img_path in data_loader:
+    for rgb, canny, gabor, targets, img_path in data_loader:
 
         if "noglass" in img_path[0]:
             continue
 
         rgb = rgb.to(device)
-        temperature = temperature.to(device)
+        canny = canny.to(device)
+        gabor = gabor.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         target_sizes = torch.stack([t["size"] for t in targets], dim=0)
@@ -95,7 +96,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device, output_dir, 
         final_size = (max_h, max_w)
 
         # change True to False for RGB only
-        outputs = model(rgb, temperature, final_size, is_rgbt)
+        outputs = model(rgb, canny, gabor, final_size, is_rgbt)
 
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         orig_masks = [t["orig_masks"] for t in targets]
@@ -109,6 +110,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device, output_dir, 
 
             rgbt_iou_list.append(iou(result, orig_mask))
             rgbt_mae_list.append(np.mean(np.abs(np.float32(result) - np.float32(orig_mask))))
+            print(img_path[i])
             scene_name = img_path[i].split("/")[-3]
             image_name = img_path[i].split("/")[-2]
 
@@ -122,13 +124,14 @@ def evaluate(model, criterion, postprocessors, data_loader, device, output_dir, 
     rgb_iou_list = []
     rgb_mae_list = []
 
-    for rgb, temperature, targets, img_path in data_loader:
+    for rgb, canny, gabor, targets, img_path in data_loader:
 
         if "noglass" not in img_path[0]:
             continue
 
         rgb = rgb.to(device)
-        temperature = temperature.to(device)
+        canny = canny.to(device)
+        gabor = gabor.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         target_sizes = torch.stack([t["size"] for t in targets], dim=0)
@@ -137,7 +140,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device, output_dir, 
         final_size = (max_h, max_w)
 
         # change True to False for RGB only
-        outputs = model(rgb, temperature, final_size, is_rgbt)
+        outputs = model(rgb, canny, gabor, final_size, is_rgbt)
 
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         orig_masks = [t["orig_masks"] for t in targets]
